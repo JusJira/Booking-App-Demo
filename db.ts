@@ -350,3 +350,13 @@ export async function listTrainers(): Promise<any[]> {
     group_size: row.group_size,
   }));
 }
+
+interface PowerBILinks {
+  id: number;
+  link: string;
+}
+
+export async function getPowerBIEmbedLinks(): Promise<PowerBILinks | null> {
+  const res = await pool.query(`SELECT * FROM links WHERE id = 1`);
+  return res.rows[0] || null;
+}

@@ -11,6 +11,7 @@ import {
   deleteBooking,
   listTrainers,
   getUserById,
+  getPowerBIEmbedLinks,
 } from "./db";
 
 const app = express();
@@ -150,40 +151,65 @@ app.get("/admin", requireLogin, async (_req: Request, res: Response) => {
   if (userDb?.role !== "admin") {
     return res.status(403).send("Forbidden");
   }
+  const powerBILink = await getPowerBIEmbedLinks();
   const rows = await listBookings();
   const rowsHtml = rows
     .map(
       (b: any) => `
     <tr>
-      <td>${b.id}</td>
-      <td>${b.createdAt}</td>
-      <td>${b.name}</td>
-      <td>${b.trainer}</td>
-      <td>${b.class}</td>
-      <td>฿${Number(b.price).toLocaleString()}</td>
+      <td class="border px-4 py-2">${b.id}</td>
+      <td class="border px-4 py-2">${b.createdAt}</td>
+      <td class="border px-4 py-2">${b.name}</td>
+      <td class="border px-4 py-2">${b.trainer}</td>
+      <td class="border px-4 py-2">${b.class}</td>
+      <td class="border px-4 py-2">฿${Number(b.price).toLocaleString()}</td>
     </tr>`
     )
     .join("");
   res.send(`<!doctype html>
-  <meta charset="utf-8"><title>Admin — Bookings</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:20px}
-    table{border-collapse:collapse;width:100%}
-    th,td{border:1px solid #eee;padding:8px;text-align:left}
-    th{background:#fafafa}
-    form{display:inline}
-    iframe{width:100vw;height:100dvh;border:none;margin-bottom:20px}
-  </style>
-  <iframe title="Neon" src="https://app.powerbi.com/reportEmbed?reportId=1ca8e813-b78f-4f33-89fb-fce0bfd4c64b&autoAuth=true&ctid=fd206715-7509-4ae5-9b96-76bb97886a84" frameborder="0" allowFullScreen="true"></iframe>
-  <h1>Bookings (Admin)</h1>
-  <p><a href="/trainers.html">← Trainers</a></p>
-  <table>
-    <thead><tr><th>ID</th><th>Date</th><th>User</th><th>Trainer</th><th>Class</th><th>Price (THB)</th></tr></thead>
-    <tbody>${
-      rowsHtml || "<tr><td colspan='6'>No bookings yet</td></tr>"
-    }</tbody>
-  </table>`);
+  <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Bookings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen p-6">
+    <div class="container mx-auto max-w-6xl">
+      <h1 class="text-3xl font-bold text-gray-800 mb-4">Bookings (Admin)</h1>
+      <p class="mb-4">
+        <a href="/trainers.html" class="text-blue-500 hover:underline">← Back to Trainers</a>
+      </p>
+      <button onclick="window.open('${
+        powerBILink?.link
+      }', '_blank')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6">
+        Open Power BI
+      </button>
+      <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-300">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="border px-4 py-2 text-left">ID</th>
+              <th class="border px-4 py-2 text-left">Date</th>
+              <th class="border px-4 py-2 text-left">User</th>
+              <th class="border px-4 py-2 text-left">Trainer</th>
+              <th class="border px-4 py-2 text-left">Class</th>
+              <th class="border px-4 py-2 text-left">Price (THB)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              rowsHtml ||
+              "<tr><td colspan='6' class='border px-4 py-2 text-center'>No bookings yet</td></tr>"
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+  </html>`);
 });
+
 app.get("/api/bookings", requireLogin, async (_req: Request, res: Response) => {
   const rows = await listBookings();
   res.json(rows);

@@ -1,17 +1,42 @@
-# tiny production image for the Express app
-FROM node:20-alpine
+# Multi-stage build for tiny production image
+FROM node:20-alpine AS build
 
 # set workdir
 WORKDIR /usr/src/app
 
-# copy manifests first for cached installs
-COPY package*.json ./
+# install pnpm
+RUN npm install -g pnpm
 
-# install deps (use `npm ci` if you have package-lock.json)
-RUN npm install --production --silent
+# copy manifests first for cached installs
+COPY package*.json pnpm-lock.yaml ./
+
+# install all deps (including dev for build)
+RUN pnpm install --frozen-lockfile
 
 # copy app sources
 COPY . .
+
+# build the TypeScript
+RUN pnpm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+# set workdir
+WORKDIR /usr/src/app
+
+# install pnpm
+RUN npm install -g pnpm
+
+# copy manifests
+COPY package*.json pnpm-lock.yaml ./
+
+# install only production deps
+RUN pnpm install --prod --frozen-lockfile
+
+# copy built app from build stage
+COPY --from=build /usr/src/app/dist ./
+COPY --from=build /usr/src/app/public ./public
 
 # use non-root user from the official image
 USER node
