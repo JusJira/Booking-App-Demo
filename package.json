@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "nodemon --exec tsx  --ext ts server.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -13,9 +15,13 @@
     "pg": "^8.16.3",
     "sqlite3": "^5.1.6"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sqlite3"
-    ]
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/express-session": "^1.18.2",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "nodemon": "^3.1.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }
