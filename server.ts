@@ -69,42 +69,19 @@ app.get("/me.html", requireLogin, (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "me.html"));
 });
 
-app.post("/login", async (req: Request, res: Response) => {
-  const name = String(req.body?.name || "").trim();
-  const password = String(req.body?.password || "").trim();
 
-  const user = await findUser(name, password);
+app.post("/login", async (req: Request, res: Response) => {
+  const { name, password } = req.body as { name: string; password: string };
+  const user = await findUser(String(name).trim(), String(password).trim());
   if (user) {
     req.session.user = { id: user.id, name: user.name, phone: user.phone };
-    return res.redirect("/trainers.html");
+    res.redirect("/trainers.html");
+  } else {
+    res
+      .status(401)
+      .send("Invalid name or password. <a href='/login.html'>Back</a>");
   }
-
-  req.session.user = undefined;
-  return res
-    .status(401)
-    .send(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login Failed</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="min-h-screen bg-neutral-800 flex items-center justify-center">
-  <div class="mx-4 w-full max-w-md text-center rounded-xl border border-neutral-700 bg-neutral-900 p-8 shadow-xl">
-    <h1 class="text-3xl md:text-4xl font-extrabold text-red-400 mb-3">
-      Invalid name or password
-    </h1>
-    <p class="text-neutral-300 mb-6">Please try again.</p>
-    <a href="/login.html"
-       class="inline-block rounded-md bg-yellow-500 px-5 py-2 font-semibold text-black hover:bg-yellow-600">
-       Back
-    </a>
-  </div>
-</body>
-</html>`);
 });
-
 app.post("/logout", (req: Request, res: Response) => {
   req.session.destroy(() => res.redirect("/login.html"));
 });
