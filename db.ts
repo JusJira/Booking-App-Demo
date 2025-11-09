@@ -234,7 +234,7 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
 // Types
 // =============================
 export interface User {
-  id: string;
+  userId: string;
   name: string;
   phone: string;
   role: string;
