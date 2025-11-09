@@ -14,9 +14,8 @@ import {
   getPowerBIEmbedLinks,
 } from "./db";
 
-const publicDir = path.join(process.cwd(), "public"); //เพิ่ม
-app.use(express.static(publicDir)); //เพิ่ม
 const app = express();
+const publicDir = path.join(process.cwd(), "public"); //เพิ่ม
 
 // Prices (THB)
 const TRAINERS: Record<string, { class: string; price: number }> = {
@@ -36,7 +35,8 @@ app.use(
     saveUninitialized: true,
   })
 );
-app.use(express.static(path.join(process.cwd(), "public"))); //แก้ใหม่
+app.use(express.static(publicDir)); //เพิ่ม1
+//app.use(express.static(path.join(process.cwd(), "public"))); //แก้ใหม่
 
 declare module "express-session" {
   interface SessionData {
@@ -62,11 +62,20 @@ function requireLogin(req: Request, res: Response, next: NextFunction): void {
 app.get("/", (_req, res) => {
   res.sendFile(path.join(publicDir, "login.html"));
 }); //เพิ่มใหม่
+app.get("/trainers.html", requireLogin, (_req: Request, res: Response) => {
+  res.sendFile(path.join(publicDir, "trainers.html"));
+});
+app.get("/booking.html", requireLogin, (_req: Request, res: Response) => {
+  res.sendFile(path.join(publicDir, "booking.html"));
+});
+app.get("/me.html", requireLogin, (_req: Request, res: Response) => {
+  res.sendFile(path.join(publicDir, "me.html"));
+});
 app.get("/probe.txt", (_req, res) => {
   res.sendFile(path.join(publicDir, "probe.txt"));
 }); //เพิ่มใหม่
 
-//app.get("/", (_req: Request, res: Response) => res.redirect("/login.html"));
+/*app.get("/", (_req: Request, res: Response) => res.redirect("/login.html"));
 app.get("/trainers.html", requireLogin, (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "trainers.html"));
 });
@@ -75,7 +84,7 @@ app.get("/booking.html", requireLogin, (_req: Request, res: Response) => {
 });
 app.get("/me.html", requireLogin, (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "me.html"));
-});
+});*/
 
 
 app.post("/login", async (req: Request, res: Response) => {
