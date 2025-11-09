@@ -9,9 +9,11 @@ import {
   User,
   listUserBookings,
   deleteBooking,
+  updateBookingStatus,
   listTrainers,
   getUserById,
   getPowerBIEmbedLinks,
+  checkExistingBooking,
 } from "./db";
 
 const app = express();
@@ -133,14 +135,14 @@ app.post(
 
       const finalPrice = price || 0;
 
-      const bookingDate = String(req.body.date || req.query.date || "").trim(); // e.g. "2025-11-05"
+      const bookingDate = String(req.body.date || req.query.date || "").trim();
       const timeSlotRaw = String(
         req.body.timeSlot || req.query.timeSlot || ""
-      ).trim(); // e.g. "13:30–15:00"
-      const startMatch = timeSlotRaw.match(/\d{1,2}:\d{2}/); // finds first "HH:MM"
-      let bookedTimeIso = new Date().toISOString(); // fallback
+      ).trim();
+      const startMatch = timeSlotRaw.match(/\d{1,2}:\d{2}/);
+      let bookedTimeIso = new Date().toISOString();
       if (bookingDate && startMatch) {
-        const startTime = startMatch[0]; // "13:30"
+        const startTime = startMatch[0];
         const dt = new Date(`${bookingDate}T${startTime}:00`);
         if (!isNaN(dt.getTime())) bookedTimeIso = dt.toISOString();
       }
