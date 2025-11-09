@@ -13,18 +13,53 @@
         <p class="text-neutral-200">
           View your upcoming and past fitness class bookings.
         </p>
-        <nav class="mt-4">
+        <nav class="mt-4 flex gap-4 items-center">
           <a href="/trainers.html" class="text-blue-500 hover:underline"
             >← Back to Trainers</a
           >
+          <form method="POST" action="/logout" class="inline">
+            <button
+              type="submit"
+              class="text-red-400 hover:text-red-300 hover:underline"
+            >
+              Logout
+            </button>
+          </form>
         </nav>
       </header>
 
-      <div id="bookings-list" class="space-y-4">
-        <!-- Bookings will be loaded here -->
+      <div class="flex gap-4 mb-6">
+        <button
+          id="upcoming-tab"
+          onclick="showTab('upcoming')"
+          class="tab-button bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 font-semibold"
+        >
+          UPCOMING
+        </button>
+        <button
+          id="history-tab"
+          onclick="showTab('history')"
+          class="tab-button bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 font-semibold"
+        >
+          HISTORY
+        </button>
       </div>
 
-      <div id="loading" class="text-center text-gray-500">
+      <div id="upcoming-section" class="section-content">
+        <h2 class="text-2xl font-bold text-white mb-4">Upcoming Classes</h2>
+        <div id="upcoming-list" class="space-y-4">
+          <!-- Upcoming bookings will be loaded here -->
+        </div>
+      </div>
+
+      <div id="history-section" class="section-content hidden">
+        <h2 class="text-2xl font-bold text-white mb-4">Booking History</h2>
+        <div id="history-list" class="space-y-4">
+          <!-- History bookings will be loaded here -->
+        </div>
+      </div>
+
+      <div id="loading" class="text-center text-gray-300">
         Loading your bookings...
       </div>
 
@@ -34,6 +69,74 @@
     </div>
 
     <script>
+      let currentTab = 'upcoming';
+
+      function showTab(tab) {
+        currentTab = tab;
+
+        const upcomingSection = document.getElementById('upcoming-section');
+        const historySection = document.getElementById('history-section');
+        const upcomingTab = document.getElementById('upcoming-tab');
+        const historyTab = document.getElementById('history-tab');
+
+        if (tab === 'upcoming') {
+          upcomingSection.classList.remove('hidden');
+          historySection.classList.add('hidden');
+          upcomingTab.classList.remove('bg-gray-600');
+          upcomingTab.classList.add('bg-blue-500');
+          historyTab.classList.remove('bg-blue-500');
+          historyTab.classList.add('bg-gray-600');
+        } else {
+          upcomingSection.classList.add('hidden');
+          historySection.classList.remove('hidden');
+          upcomingTab.classList.remove('bg-blue-500');
+          upcomingTab.classList.add('bg-gray-600');
+          historyTab.classList.remove('bg-gray-600');
+          historyTab.classList.add('bg-blue-500');
+        }
+      }
+
+      function getStatusBadge(status) {
+        const colors = {
+          booked: 'bg-blue-100 text-blue-800',
+          cancelled: 'bg-red-100 text-red-800',
+          finished: 'bg-green-100 text-green-800'
+        };
+        return `<span class="px-3 py-1 rounded-full text-sm font-semibold ${colors[status] || 'bg-gray-100 text-gray-800'}">${status.toUpperCase()}</span>`;
+      }
+
+      function renderBooking(booking, isUpcoming) {
+        const status = booking.status || 'booked';
+        const isBooked = status === 'booked';
+        const isCancelled = status === 'cancelled';
+        const isFinished = status === 'finished';
+
+        return `
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <h2 class="text-xl font-semibold text-gray-800">${booking.trainer} - ${booking.class}</h2>
+                <p class="text-gray-600 mt-1">Date: ${new Date(booking.bookedTime).toLocaleDateString()}</p>
+                <p class="text-gray-600">Time: ${new Date(booking.bookedTime).toLocaleTimeString()}</p>
+                <p class="text-gray-600">Price: ฿${booking.price.toLocaleString()}</p>
+                <p class="text-sm text-gray-500 mt-2">Booked on: ${new Date(booking.createdAt).toLocaleDateString()}</p>
+              </div>
+              <div>
+                ${getStatusBadge(status)}
+              </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+              ${isBooked ? `
+                <button onclick="markAsFinished('${booking.id}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Mark as Finished</button>
+                <button onclick="cancelBooking('${booking.id}')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel Booking</button>
+              ` : ''}
+              ${isCancelled ? '<p class="text-gray-500 text-sm">This booking was cancelled</p>' : ''}
+              ${isFinished ? '<p class="text-green-600 text-sm font-semibold">✓ Class completed!</p>' : ''}
+            </div>
+          </div>
+        `;
+      }
+
       async function loadBookings() {
         try {
           const response = await fetch("/api/bookings/me");
@@ -46,40 +149,28 @@
           }
           const bookings = await response.json();
 
-          const bookingsList = document.getElementById("bookings-list");
+          const upcomingList = document.getElementById("upcoming-list");
+          const historyList = document.getElementById("history-list");
           const loading = document.getElementById("loading");
           loading.style.display = "none";
 
-          if (bookings.length === 0) {
-            bookingsList.innerHTML =
-              '<p class="text-gray-500">No bookings found.</p>';
-            return;
+          const upcomingBookings = bookings.filter(b => (b.status || 'booked') === 'booked');
+          const historyBookings = bookings.filter(b => {
+            const status = b.status || 'booked';
+            return status === 'cancelled' || status === 'finished';
+          });
+
+          if (upcomingBookings.length === 0) {
+            upcomingList.innerHTML = '<p class="text-gray-200">No upcoming bookings. Book your first class!</p>';
+          } else {
+            upcomingList.innerHTML = upcomingBookings.map(b => renderBooking(b, true)).join("");
           }
 
-          bookingsList.innerHTML = bookings
-            .map(
-              (booking) => `
-          <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold text-gray-800">${
-              booking.trainer
-            } - ${booking.class}</h2>
-            <p class="text-gray-600">Date: ${new Date(
-              booking.bookedTime
-            ).toLocaleDateString()}</p>
-            <p class="text-gray-600">Time: ${new Date(
-              booking.bookedTime
-            ).toLocaleTimeString()}</p>
-            <p class="text-gray-600">Price: ฿${booking.price.toLocaleString()}</p>
-            <p class="text-sm text-gray-500">Booked on: ${new Date(
-              booking.createdAt
-            ).toLocaleDateString()}</p>
-            <button onclick="cancelBooking('${
-              booking.id
-            }')" class="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel Booking</button>
-          </div>
-        `
-            )
-            .join("");
+          if (historyBookings.length === 0) {
+            historyList.innerHTML = '<p class="text-gray-200">No booking history yet.</p>';
+          } else {
+            historyList.innerHTML = historyBookings.map(b => renderBooking(b, false)).join("");
+          }
         } catch (err) {
           console.error(err);
           document.getElementById("loading").style.display = "none";
@@ -97,14 +188,34 @@
             throw new Error("Failed to cancel booking");
           }
           alert("Booking cancelled successfully.");
-          loadBookings(); // Reload the list
+          loadBookings();
         } catch (err) {
           console.error(err);
           alert("Failed to cancel booking. Please try again.");
         }
       }
 
-      // Load bookings on page load
+      async function markAsFinished(id) {
+        if (!confirm("Mark this class as finished?")) return;
+        try {
+          const response = await fetch(`/api/bookings/${id}/status`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ status: "finished" }),
+          });
+          if (!response.ok) {
+            throw new Error("Failed to update booking status");
+          }
+          alert("Class marked as finished!");
+          loadBookings();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to update booking status. Please try again.");
+        }
+      }
+
       loadBookings();
     </script>
   </body>
