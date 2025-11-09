@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import session from "express-session";
+import jwt from "jsonwebtoken";
 import path from "path";
 import {
   addUser,
@@ -16,49 +16,60 @@ import {
 
 const app = express();
 
-// Prices (THB)
-const TRAINERS: Record<string, { class: string; price: number }> = {
-  "John Carter": { class: "Strength", price: 1100 },
-  "Sophia Miller": { class: "Yoga & Flexibility", price: 1300 },
-  "Michael Brown": { class: "Cardio Fitness", price: 1800 },
-  "Emma Wilson": { class: "CrossFit", price: 2000 },
-  "Daniel Smith": { class: "Zumba & Dance", price: 1500 },
-};
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(
-  session({
-    secret: "fitness-secret-key",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
 app.use(express.static(path.join(__dirname, "public")));
 
-declare module "express-session" {
-  interface SessionData {
-    user?: {
-      id: string;
-      name: string;
-      phone?: string;
-    };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string; name: string; phone?: string; role?: string };
+    }
   }
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || "replace-me-with-secure-secret";
+const JWT_EXPIRES = "7d";
+
 function requireLogin(req: Request, res: Response, next: NextFunction): void {
-  if (!req.session.user) {
+  try {
+    // token can come from Authorization header "Bearer <token>" or cookie "token"
+    const auth = String(req.headers.authorization || "");
+    const tokenFromHeader = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    const tokenFromCookie = (req.headers.cookie || "")
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("token="))
+      ?.split("=")[1];
+    const token = tokenFromHeader || tokenFromCookie;
+
+    if (!token) {
+      if (req.path.startsWith("/api/")) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      res.redirect("/login.html");
+      return;
+    }
+
+    const payload = jwt.verify(token, JWT_SECRET) as any;
+    req.user = {
+      id: payload.id,
+      name: payload.name,
+      phone: payload.phone,
+      role: payload.role,
+    };
+    next();
+  } catch (err) {
     if (req.path.startsWith("/api/")) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
     res.redirect("/login.html");
-    return;
   }
-  next();
 }
 
-app.get("/", (_req: Request, res: Response) => res.redirect("/login.html"));
+app.get("/", (_req: Request, res: Response) => res.redirect("/index.html"));
 app.get("/trainers.html", requireLogin, (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "trainers.html"));
 });
@@ -72,23 +83,37 @@ app.get("/me.html", requireLogin, (_req: Request, res: Response) => {
 app.post("/login", async (req: Request, res: Response) => {
   const { name, password } = req.body as { name: string; password: string };
   const user = await findUser(String(name).trim(), String(password).trim());
-  if (user) {
-    req.session.user = { id: user.id, name: user.name, phone: user.phone };
-    res.redirect("/trainers.html");
-  } else {
-    res
+  if (!user) {
+    return res
       .status(401)
       .send("Invalid name or password. <a href='/login.html'>Back</a>");
   }
+  const payload = {
+    id: user.id,
+    name: user.name,
+    phone: user.phone,
+    role: user.role,
+  };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  // set httpOnly cookie for browser flows; frontends can also read token from response if needed
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  } as any);
+  res.redirect("/trainers.html");
 });
 
-app.post("/logout", (req: Request, res: Response) => {
-  req.session.destroy(() => res.redirect("/login.html"));
+app.post("/logout", (_req: Request, res: Response) => {
+  // clear the token cookie
+  res.clearCookie("token");
+  res.redirect("/index.html");
 });
 
 app.get("/api/me", requireLogin, async (req: Request, res: Response) => {
-  const user = req.session.user!;
-  const userDb = await getUserById(user.id);
+  const userId = req.user!.id;
+  const userDb = await getUserById(userId);
   res.json(userDb);
 });
 
@@ -98,7 +123,7 @@ app.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       console.log("Booking request body:", req.body);
-      const user = req.session.user!;
+      const user = req.user!;
       const trainerId = String(req.body.trainerId || "").trim();
       const classId = String(req.body.classId || "").trim();
       const price = Number(req.body.price || 0);
@@ -146,7 +171,7 @@ app.post(
 );
 
 app.get("/admin", requireLogin, async (_req: Request, res: Response) => {
-  const user = _req.session.user!;
+  const user = _req.user!;
   const userDb = await getUserById(user.id);
   if (userDb?.role !== "admin") {
     return res.status(403).send("Forbidden");
@@ -219,7 +244,7 @@ app.get(
   "/api/bookings/me",
   requireLogin,
   async (req: Request, res: Response) => {
-    const user = req.session.user!;
+    const user = req.user!;
     const rows = await listUserBookings(user.id);
     res.json(rows);
   }
@@ -231,7 +256,7 @@ app.delete(
   async (req: Request, res: Response) => {
     try {
       const bookingId = req.params.id;
-      const userId = req.session.user!.id;
+      const userId = req.user!.id;
       if (!bookingId) {
         return res.status(400).json({ error: "Booking ID is required" });
       }
