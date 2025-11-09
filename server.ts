@@ -178,21 +178,26 @@ app.get("/admin", requireLogin, async (_req: Request, res: Response) => {
   if (userDb?.role !== "admin") {
     return res.status(403).send("Forbidden");
   }
+
   const powerBILink = await getPowerBIEmbedLinks();
   const rows = await listBookings();
-  const rowsHtml = rows
-    .map(
-      (b: any) => `
-    <tr>
+
+  const rowsHtml = rows.map((b: any) => `
+    <tr data-row-id="${b.id}">
       <td class="border px-4 py-2">${b.id}</td>
       <td class="border px-4 py-2">${b.createdAt}</td>
       <td class="border px-4 py-2">${b.name}</td>
       <td class="border px-4 py-2">${b.trainer}</td>
       <td class="border px-4 py-2">${b.class}</td>
       <td class="border px-4 py-2">฿${Number(b.price).toLocaleString()}</td>
-    </tr>`
-    )
-    .join("");
+      <td class="border px-4 py-2">${b.status || "booked"}</td>
+      <td class="border px-4 py-2 space-x-2">
+        <button class="bg-green-600 text-white px-3 py-1 rounded" onclick="chg(${b.id}, 'finished')">Finish</button>
+        <button class="bg-red-600 text-white px-3 py-1 rounded" onclick="chg(${b.id}, 'cancelled')">Cancel</button>
+      </td>
+    </tr>
+  `).join("");
+
   res.send(`<!doctype html>
   <html lang="en">
   <head>
@@ -207,11 +212,11 @@ app.get("/admin", requireLogin, async (_req: Request, res: Response) => {
       <p class="mb-4">
         <a href="/trainers.html" class="text-blue-500 hover:underline">← Back to Trainers</a>
       </p>
-      <button onclick="window.open('${
-        powerBILink?.link
-      }', '_blank')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6">
+      <button onclick="window.open('${powerBILink?.link || "#"}', '_blank')"
+              class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6">
         Open Power BI
       </button>
+
       <div class="overflow-x-auto">
         <table class="min-w-full bg-white border border-gray-300">
           <thead class="bg-gray-50">
@@ -222,17 +227,55 @@ app.get("/admin", requireLogin, async (_req: Request, res: Response) => {
               <th class="border px-4 py-2 text-left">Trainer</th>
               <th class="border px-4 py-2 text-left">Class</th>
               <th class="border px-4 py-2 text-left">Price (THB)</th>
+              <th class="border px-4 py-2 text-left">Status</th>
+              <th class="border px-4 py-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${
-              rowsHtml ||
-              "<tr><td colspan='6' class='border px-4 py-2 text-center'>No bookings yet</td></tr>"
-            }
+            ${rowsHtml || "<tr><td colspan='8' class='border px-4 py-2 text-center'>No bookings yet</td></tr>"}
           </tbody>
         </table>
       </div>
     </div>
+
+    <!-- Toast -->
+    <div id="toast"
+         class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-neutral-900 text-white px-4 py-2 rounded shadow-lg z-50">
+    </div>
+
+    <script>
+      function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.remove('hidden');
+        setTimeout(() => t.classList.add('hidden'), 2000);
+      }
+
+      async function chg(id, status) {
+        try {
+          const r = await fetch('/api/bookings/' + id + '/status', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+          });
+
+          if (!r.ok) {
+            let msg = 'failed';
+            try { msg = (await r.text()) || msg; } catch(e) {}
+            showToast(msg);             // ✅ ไม่มี “xxx.vercel.app says”
+            return;
+          }
+
+          // อัปเดตค่า status ในแถวทันที
+          const row = document.querySelector('tr[data-row-id="' + id + '"]');
+          if (row && row.children[6]) row.children[6].textContent = status;
+
+          showToast('updated');
+        } catch (e) {
+          showToast('failed');
+        }
+      }
+    </script>
   </body>
   </html>`);
 });
