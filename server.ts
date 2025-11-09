@@ -14,6 +14,8 @@ import {
   getPowerBIEmbedLinks,
 } from "./db";
 
+const publicDir = path.join(process.cwd(), "public"); //เพิ่ม
+app.use(express.static(publicDir)); //เพิ่ม
 const app = express();
 
 // Prices (THB)
@@ -34,7 +36,7 @@ app.use(
     saveUninitialized: true,
   })
 );
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(process.cwd(), "public"))); //แก้ใหม่
 
 declare module "express-session" {
   interface SessionData {
@@ -57,8 +59,14 @@ function requireLogin(req: Request, res: Response, next: NextFunction): void {
   }
   next();
 }
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(publicDir, "login.html"));
+}); //เพิ่มใหม่
+app.get("/probe.txt", (_req, res) => {
+  res.sendFile(path.join(publicDir, "probe.txt"));
+}); //เพิ่มใหม่
 
-app.get("/", (_req: Request, res: Response) => res.redirect("/login.html"));
+//app.get("/", (_req: Request, res: Response) => res.redirect("/login.html"));
 app.get("/trainers.html", requireLogin, (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "public", "trainers.html"));
 });
