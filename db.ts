@@ -331,7 +331,7 @@ export async function getClassById(id: string): Promise<any | null> {
 
 export async function listTrainers(): Promise<any[]> {
   const trainerRes = await pool.query(`
-    SELECT id, name, schedule, class_id FROM trainers ORDER BY name
+    SELECT id, name, schedule FROM trainers ORDER BY name
   `);
 
   const classRes = await pool.query(`
