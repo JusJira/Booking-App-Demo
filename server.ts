@@ -285,7 +285,7 @@ app.post("/signup", async (req: Request, res: Response) => {
   try {
     const name = String(req.body.name || "").trim();
     const password = String(req.body.password || "").trim();
-    const email = String(req.body.phone || "").trim();
+    const email = String(req.body.email || "").trim();
     const phone = String(req.body.phone || "").trim();
 
     if (!name || !password || !email || !phone) {
