@@ -1,3 +1,115 @@
+<!--<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Bookings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-neutral-800 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold text-white">My Bookings</h1>
+        <p class="text-neutral-200">
+          View your upcoming and past fitness class bookings.
+        </p>
+        <nav class="mt-4">
+          <a href="/trainers.html" class="text-blue-500 hover:underline"
+            >← Back to Trainers</a
+          >
+        </nav>
+      </header>
+
+      <div id="bookings-list" class="space-y-4">
+        <!-- Bookings will be loaded here -->
+      <!--</div>
+
+      <div id="loading" class="text-center text-gray-500">
+        Loading your bookings...
+      </div>
+
+      <div id="error" class="text-center text-red-500 hidden">
+        Failed to load bookings. Please try again.
+      </div>
+    </div>
+
+    <script>
+      async function loadBookings() {
+        try {
+          const response = await fetch("/api/bookings/me");
+          if (response.status === 401) {
+            window.location.href = "/login.html";
+            return;
+          }
+          if (!response.ok) {
+            throw new Error("Failed to fetch bookings");
+          }
+          const bookings = await response.json();
+
+          const bookingsList = document.getElementById("bookings-list");
+          const loading = document.getElementById("loading");
+          loading.style.display = "none";
+
+          if (bookings.length === 0) {
+            bookingsList.innerHTML =
+              '<p class="text-gray-500">No bookings found.</p>';
+            return;
+          }
+
+          bookingsList.innerHTML = bookings
+            .map(
+              (booking) => `
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-gray-800">${
+              booking.trainer
+            } - ${booking.class}</h2>
+            <p class="text-gray-600">Date: ${new Date(
+              booking.bookedTime
+            ).toLocaleDateString()}</p>
+            <p class="text-gray-600">Time: ${new Date(
+              booking.bookedTime
+            ).toLocaleTimeString()}</p>
+            <p class="text-gray-600">Price: ฿${booking.price.toLocaleString()}</p>
+            <p class="text-sm text-gray-500">Booked on: ${new Date(
+              booking.createdAt
+            ).toLocaleDateString()}</p>
+            <button onclick="cancelBooking('${
+              booking.id
+            }')" class="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Cancel Booking</button>
+          </div>
+        `
+            )
+            .join("");
+        } catch (err) {
+          console.error(err);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("error").classList.remove("hidden");
+        }
+      }
+
+      async function cancelBooking(id) {
+        if (!confirm("Are you sure you want to cancel this booking?")) return;
+        try {
+          const response = await fetch(`/api/bookings/${id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Failed to cancel booking");
+          }
+          alert("Booking cancelled successfully.");
+          loadBookings(); // Reload the list
+        } catch (err) {
+          console.error(err);
+          alert("Failed to cancel booking. Please try again.");
+        }
+      }
+
+      // Load bookings on page load
+      loadBookings();
+    </script>
+  </body>
+</html>-->
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -176,6 +288,10 @@
           document.getElementById("loading").style.display = "none";
           document.getElementById("error").classList.remove("hidden");
         }
+        finally {
+          document.getElementById("loading").style.display = "none";
+        }
+
       }
 
       async function cancelBooking(id) {
