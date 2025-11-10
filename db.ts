@@ -331,15 +331,17 @@ export async function getClassById(id: string): Promise<any | null> {
 
 export async function listTrainers(): Promise<any[]> {
   const trainerRes = await pool.query(`
-    SELECT id, name, schedule FROM trainers ORDER BY name
+    SELECT id, name, schedule, class_id FROM trainers ORDER BY name
   `);
+
   const classRes = await pool.query(`
     SELECT id, name, price, about, syllabus, level, length, group_size FROM classes
   `);
+
   const classMap = new Map(classRes.rows.map(c => [c.id, c]));
 
   return trainerRes.rows.map((t) => {
-  const c = classMap.get(t.class_id); 
+    const c = classMap.get(t.class_id);
     return {
       id: t.id,
       name: t.name,
@@ -352,8 +354,10 @@ export async function listTrainers(): Promise<any[]> {
       level: c?.level ?? null,
       length: c?.length ?? null,
       group_size: c?.group_size ?? null,
+    };
   });
 }
+
 
 interface PowerBILinks {
   id: number;
