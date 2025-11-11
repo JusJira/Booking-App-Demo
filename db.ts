@@ -335,7 +335,7 @@ export async function listTrainers(): Promise<any[]> {
       t.id AS trainer_id,
       t.name AS trainer_name,
       t.schedule AS trainer_schedule,
-      
+
       c.id AS class_id,
       c.name AS class_name,
       c.price AS price,
@@ -347,9 +347,9 @@ export async function listTrainers(): Promise<any[]> {
 
     FROM trainers t
     LEFT JOIN bookings b
-      ON t.id = b.trainerId
+      ON t.id = b."trainerId"     -- ✅ ใส่เครื่องหมาย " "
     LEFT JOIN classes c
-      ON b.classId = c.id
+      ON b."classId" = c.id       -- ✅ ใส่เครื่องหมาย " "
     GROUP BY
       t.id, t.name, t.schedule,
       c.id, c.name, c.price, c.about, c.syllabus, c.level, c.length, c.group_size
@@ -372,6 +372,7 @@ export async function listTrainers(): Promise<any[]> {
     group_size: r.group_size,
   }));
 }
+
 
 
 // NEW: คืนรายการคลาสทั้งหมด
