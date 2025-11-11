@@ -318,23 +318,39 @@ export async function addBooking(input: BookingInput): Promise<{ id: string }> {
 
 export async function listBookings(): Promise<any[]> {
   const res = await pool.query(
-    `SELECT b.id, b.name, b."createdAt", b."bookedTime", b.price, t.name as trainer, c.name as class
-    FROM bookings b
-    JOIN trainers t ON b."trainerId" = t.id
-    JOIN classes c ON b."classId" = c.id
-    ORDER BY b."createdAt" DESC`
+    `SELECT 
+        b.id,
+        b.name,
+        b."createdAt",
+        b."bookedTime",
+        b.price,
+        COALESCE(b.status, 'booked') AS status,
+        t.name AS trainer,
+        c.name AS class
+     FROM bookings b
+     JOIN trainers t ON b."trainerId" = t.id
+     JOIN classes  c ON b."classId"  = c.id
+     ORDER BY b."createdAt" DESC`
   );
   return res.rows;
 }
 
 export async function listUserBookings(userId: string): Promise<any[]> {
   const res = await pool.query(
-    `SELECT b.id, b.name, b."createdAt", b."bookedTime", b.price, t.name as trainer, c.name as class
-    FROM bookings b
-    JOIN trainers t ON b."trainerId" = t.id
-    JOIN classes c ON b."classId" = c.id
-    WHERE b."userId" = $1
-    ORDER BY b."createdAt" DESC`,
+    `SELECT 
+        b.id,
+        b.name,
+        b."createdAt",
+        b."bookedTime",
+        b.price,
+        COALESCE(b.status, 'booked') AS status,
+        t.name AS trainer,
+        c.name AS class
+     FROM bookings b
+     JOIN trainers t ON b."trainerId" = t.id
+     JOIN classes  c ON b."classId"  = c.id
+     WHERE b."userId" = $1
+     ORDER BY b."createdAt" DESC`,
     [userId]
   );
   return res.rows;
