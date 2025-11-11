@@ -54,6 +54,7 @@
             id="date"
             name="date"
             type="date"
+            min=""
             required
             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -93,6 +94,40 @@
 
     <script>
       /* ----------------- Helpers ----------------- */
+  function lockPastDates(dateInput) {
+  // คืนค่า YYYY-MM-DD ตามเวลาท้องถิ่น
+  const todayISO = toISODateLocal(new Date());
+
+  // ตั้ง min (และ max 90 วันข้างหน้า เพื่อ UX)
+  dateInput.min = todayISO;
+  const max = new Date();
+  max.setDate(max.getDate() + 90);
+  dateInput.max = toISODateLocal(max);
+
+  // ถ้าค่าเดิมย้อนหลัง → ดันกลับมาวันนี้
+  if (dateInput.value && dateInput.value < todayISO) {
+    dateInput.value = todayISO;
+  }
+
+  // ป้องกันการพิมพ์ย้อนหลังเอง
+  dateInput.addEventListener("change", (e) => {
+    if (e.target.value && e.target.value < dateInput.min) {
+      e.target.value = dateInput.min;
+    }
+  });
+
+  // บางเบราว์เซอร์อ่าน min ตอนเปิดปฏิทินครั้งแรก
+  // อัปเดต min ทุกครั้งที่ focus/คลิก เพื่อกัน timezone shift
+  const refreshMin = () => {
+    const nowISO = toISODateLocal(new Date());
+    dateInput.min = nowISO;
+    if (dateInput.value && dateInput.value < nowISO) {
+      dateInput.value = nowISO;
+    }
+  };
+  dateInput.addEventListener("focus", refreshMin);
+  dateInput.addEventListener("click", refreshMin);
+}
       function qp(key){ return new URLSearchParams(location.search).get(key)||""; }
       function toISODateLocal(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d.getTime()-tz).toISOString().slice(0,10); }
       function parseISODate(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -210,8 +245,16 @@
         }
         if(!defaultISO) defaultISO=getFirstAvailableDate(sched,90);
 
-        const dateInput=document.getElementById("date");
-        dateInput.value=defaultISO || "";
+       const dateInput = document.getElementById("date");
+
+       // ถ้า preferredISO อยู่ในอดีต ให้ตัดทิ้ง
+        const todayISO = toISODateLocal(new Date());
+        if (defaultISO && defaultISO < todayISO) defaultISO = "";
+
+        // เซ็ตค่าและ "ล็อกไม่ให้เลือกย้อนหลัง"
+        dateInput.value = defaultISO || todayISO;
+        lockPastDates(dateInput);
+
         refreshTimeOptionsForDate(sched, dateInput.value);
 
         // ใส่เวลาที่มากับ query ถ้าตรง
