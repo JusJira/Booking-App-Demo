@@ -124,49 +124,57 @@ app.post(
   requireLogin,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      console.log("Booking request body:", req.body);
       const user = req.user!;
       const trainerId = String(req.body.trainerId || "").trim();
-      const classId = String(req.body.classId || "").trim();
-      const price = Number(req.body.price || 0);
+      const classId   = String(req.body.classId   || "").trim();
+      const price     = Number(req.body.price || 0);
 
       const trainerName = String(req.body.trainer || "").trim();
-      const className = String(req.body.class || "").trim();
+      const className   = String(req.body.class   || "").trim();
 
-      const finalPrice = price || 0;
-
-      const bookingDate = String(req.body.date || req.query.date || "").trim(); // e.g. "2025-11-05"
-      const timeSlotRaw = String(
-        req.body.timeSlot || req.query.timeSlot || ""
-      ).trim(); // e.g. "13:30–15:00"
-      const startMatch = timeSlotRaw.match(/\d{1,2}:\d{2}/); // finds first "HH:MM"
+      // ---- สร้าง ISO ของเวลาที่จะจองจากวันที่ + ช่วงเวลา ----
+      const bookingDate = String(req.body.date || req.query.date || "").trim();     // "YYYY-MM-DD"
+      const timeSlotRaw = String(req.body.timeSlot || req.query.timeSlot || "").trim(); // "HH:MM-HH:MM" หรือ "HH:MM–HH:MM"
+      const startMatch  = timeSlotRaw.match(/\d{1,2}:\d{2}/); // ดึง HH:MM ตัวแรก
       let bookedTimeIso = new Date().toISOString(); // fallback
       if (bookingDate && startMatch) {
-        const startTime = startMatch[0]; // "13:30"
-        const dt = new Date(`${bookingDate}T${startTime}:00`);
+        const dt = new Date(`${bookingDate}T${startMatch[0]}:00`);
         if (!isNaN(dt.getTime())) bookedTimeIso = dt.toISOString();
       }
 
-      const record = {
+      // ---- เรียก addBooking (ภายในเช็คกันซ้ำ + จับ unique constraint) ----
+      const { id } = await addBooking({
         userId: user.id,
         name: user.name,
-        trainerId: trainerId,
-        classId: classId,
-        price: finalPrice,
+        trainerId,
+        classId,
+        price,
         createdAt: new Date().toISOString(),
         bookedTime: bookedTimeIso,
-      };
-      const { id } = await addBooking(record);
+      });
 
+      // สำเร็จ → ไปหน้า success
       const q = new URLSearchParams({
         id: String(id),
         name: user.name,
         trainer: trainerName,
         class: className,
-        price: String(finalPrice),
+        price: String(price || 0),
       }).toString();
       res.redirect(`/success.html?${q}`);
-    } catch (err) {
+
+    } catch (err: any) {
+      // กันจองซ้ำ: addBooking จะโยน code 'DUPLICATE_BOOKING' หรือ DB โยน 23505
+      if (err?.code === "DUPLICATE_BOOKING" || err?.code === "23505") {
+        res.status(409).send(`
+          <html><body style="font-family: ui-sans-serif">
+            <h2>Duplicate booking</h2>
+            <p>You already booked this class at the same time.</p>
+            <p><a href="/trainers.html">← Back to Trainers</a></p>
+          </body></html>
+        `);
+        return;
+      }
       next(err);
     }
   }
