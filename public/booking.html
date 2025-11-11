@@ -47,4 +47,249 @@
             <option value="">Loading…</option>
           </select>
           <div id="scheduleNote" class="text-sm text-gray-500 mt-2"></div>
-          <div id="diag" class="text-x
+          <div id="diag" class="text-xs text-gray-400 mt-1 whitespace-pre-wrap"></div>
+        </div>
+
+        <input type="hidden" name="trainerId" id="trainerId" />
+        <input type="hidden" name="classId" id="classId" />
+
+        <button id="bookBtn" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed" style="margin-top: 12px">
+          Book Now
+        </button>
+      </form>
+
+      <p class="mt-4">
+        <a href="/trainers.html" class="text-blue-500 hover:underline">← Back to class</a>
+      </p>
+    </div>
+
+    <script>
+      /* ------------ tiny helpers ------------ */
+      const $ = (id) => document.getElementById(id);
+      const log = (msg) => { const d=$("diag"); d.textContent += (d.textContent? "\n":"") + msg; };
+
+      function qp(key){ return new URLSearchParams(location.search).get(key)||""; }
+      function toISODateLocal(d){ const tz=d.getTimezoneOffset()*60000; return new Date(d.getTime()-tz).toISOString().slice(0,10); }
+      function parseISODate(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+      function weekdayKeyFromDateStr(iso){ return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][parseISODate(iso).getDay()]; }
+
+      function setLoading(isLoading,msg){
+        const timeSel=$("timeSlot");
+        const note=$("scheduleNote");
+        const btn=$("bookBtn");
+        if(isLoading){
+          btn.disabled=true;
+          timeSel.disabled=true;
+          timeSel.innerHTML='<option value="">Loading…</option>';
+          note.textContent = msg || "Loading schedule…";
+        }else{
+          timeSel.disabled=false;
+          if(!timeSel.options.length) timeSel.innerHTML='<option value="">Choose a time</option>';
+          if(note.textContent.startsWith("Loading")) note.textContent = "";
+          btn.disabled=false;
+        }
+      }
+      function showError(message){
+        const note=$("scheduleNote");
+        note.textContent=message;
+        note.classList.remove("text-gray-500");
+        note.classList.add("text-red-600");
+        $("bookBtn").disabled=true;
+      }
+      window.addEventListener("error", e => showError("Script error: "+(e.message||"unknown")));
+      window.addEventListener("unhandledrejection", e => showError("Promise error: "+(e.reason?.message||e.reason||"unknown")));
+
+      /* ------------ schedule parsing ------------ */
+      function normalizeDayToAbbrev(token){
+        if(!token) return "";
+        const t=token.toString().trim().toLowerCase();
+        const map={sun:"Sun",sunday:"Sun",mon:"Mon",monday:"Mon",tue:"Tue",tues:"Tue",tuesday:"Tue",wed:"Wed",weds:"Wed",wednesday:"Wed",thu:"Thu",thur:"Thu",thurs:"Thu",thursday:"Thu",fri:"Fri",friday:"Fri",sat:"Sat",saturday:"Sat"};
+        return map[t]||map[t.slice(0,3)]||"";
+      }
+      function coerceScheduleToArray(raw){
+        if(Array.isArray(raw)) return raw;
+        if(typeof raw==="string"){
+          try{ return JSON.parse(raw); }catch{ return raw.split(",").map(s=>s.trim()).filter(Boolean); }
+        }
+        if(raw && typeof raw==="object"){
+          const out=[];
+          for(const k of Object.keys(raw)){
+            const d=normalizeDayToAbbrev(k); const v=raw[k];
+            if(Array.isArray(v)) v.forEach(t=>typeof t==="string" && out.push(`${d} ${t}`));
+            else if(typeof v==="string") out.push(`${d} ${v}`);
+          }
+          return out;
+        }
+        return [];
+      }
+      function buildWeekScheduleLoose(trainer){
+        const sched={}; if(!trainer) return sched;
+        const arr=coerceScheduleToArray(trainer.schedule);
+        arr.forEach(slot=>{
+          if(typeof slot!=="string") return;
+          const s=slot.replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g,"-").replace(/\s+/g," ").trim();
+          const i=s.indexOf(" "); if(i<0) return;
+          const day=normalizeDayToAbbrev(s.slice(0,i));
+          const time=s.slice(i+1);
+          if(!day||!time) return;
+          if(!sched[day]) sched[day]=[];
+          sched[day].push(time);
+        });
+        return sched;
+      }
+
+      /* ------------ fill UI ------------ */
+      function getAvailableDates(sched,maxDays=90){
+        const dates=[]; let d=new Date();
+        for(let i=0;i<maxDays;i++){
+          const iso=toISODateLocal(d);
+          const wk=weekdayKeyFromDateStr(iso);
+          if(sched[wk] && sched[wk].length) dates.push(iso);
+          d.setDate(d.getDate()+1);
+        }
+        return dates;
+      }
+      function fillDateOptions(sched){
+        const dateInput=$("date");
+        const today=new Date(), max=new Date(); max.setDate(today.getDate()+90);
+        dateInput.min=toISODateLocal(today);
+        dateInput.max=toISODateLocal(max);
+        const availableDates=getAvailableDates(sched);
+        if(availableDates[0]) dateInput.value=availableDates[0];
+        return availableDates;
+      }
+      function fillTimeOptionsForDate(sched,isoDate){
+        const timeSel=$("timeSlot");
+        const note=$("scheduleNote");
+        const btn=$("bookBtn");
+        timeSel.innerHTML='<option value="">Choose a time</option>';
+        if(!isoDate){ note.textContent="Please pick a date."; btn.disabled=true; return; }
+        const wk=weekdayKeyFromDateStr(isoDate);
+        const slots=sched[wk]||[];
+        if(slots.length){
+          slots.forEach(t=>{ const opt=document.createElement("option"); opt.value=t; opt.textContent=t; timeSel.appendChild(opt); });
+          note.textContent=`Available on ${wk}: ${slots.join(", ")}`;
+          btn.disabled=false;
+        }else{
+          note.textContent="No classes on this day.";
+          btn.disabled=true;
+        }
+      }
+
+      /* ------------ robust fetch with timeout & reporting ------------ */
+      function fetchWithTimeout(url, ms){
+        log(`→ Fetch ${url} (timeout ${ms}ms)`);
+        const controller=new AbortController();
+        const id=setTimeout(()=>controller.abort(), ms);
+        return fetch(url,{signal:controller.signal})
+          .then(r=>{
+            clearTimeout(id);
+            log(`✓ ${url} → status ${r.status}`);
+            if(!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
+            return r.json().then(j=>({ok:true, data:j})).catch(e=>{ throw new Error(`${url} → JSON parse failed`); });
+          })
+          .catch(err=>{
+            log(`✗ ${url} failed: ${err.message||err}`);
+            return {ok:false, error: err};
+          });
+      }
+
+      async function loadTrainersAny(){
+        // เรียก 2 route พร้อมกัน แล้วใช้ตัวที่สำเร็จก่อน
+        const TIMEOUT = 7000; // 7s/route
+        const p1 = fetchWithTimeout("/api/trainers", TIMEOUT);
+        const p2 = fetchWithTimeout("/trainers", TIMEOUT);
+
+        const [r1, r2] = await Promise.allSettled([p1, p2]);
+        const a = r1.status==="fulfilled" ? r1.value : {ok:false, error:r1.reason};
+        const b = r2.status==="fulfilled" ? r2.value : {ok:false, error:r2.reason};
+
+        if (a.ok) return a.data;
+        if (b.ok) return b.data;
+
+        // ทั้งคู่ล้มเหลว
+        throw new Error("Both routes failed.");
+      }
+
+      /* ------------ main ------------ */
+      async function init(){
+        setLoading(true, "Loading schedule…");
+
+        // Prefill fields
+        const trainerSelect=$("trainer");
+        let trainerName=qp("trainer") || trainerSelect.value;
+        $("class").value = qp("class") || "";
+        $("price").value = qp("price") || "";
+        $("classId").value = qp("classId") || "";
+        const opt = Array.from(trainerSelect.options).find(o=>o.value===trainerName) || trainerSelect.selectedOptions[0];
+        trainerSelect.value = opt.value;
+        $("trainerId").value = opt.getAttribute("data-id");
+
+        // Fetch trainers with strong reporting
+        let trainers;
+        try{
+          if (location.protocol === "file:") {
+            log("⚠ You are opening this file via file:// — fetch to /api/trainers will not work. Serve via http(s).");
+          }
+          log(`navigator.onLine = ${navigator.onLine}`);
+          trainers = await loadTrainersAny();
+          log(`Received trainers JSON (length=${Array.isArray(trainers)? trainers.length : "?"})`);
+        }catch(err){
+          showError("Cannot load trainers (both /api/trainers and /trainers failed).");
+          log("Fatal: "+(err.message||err));
+          setLoading(false);
+          return;
+        }
+
+        const trainer = Array.isArray(trainers) ? trainers.find(t=>t.name===trainerName) : null;
+        if(!trainer){
+          showError("Trainer not found from API.");
+          log("Trainer list sample: "+JSON.stringify(trainers?.[0] || {}, null, 2).slice(0,200)+"…");
+          setLoading(false);
+          return;
+        }
+
+        const sched = buildWeekScheduleLoose(trainer);
+        log("Built schedule keys: "+Object.keys(sched).join(", "));
+        if(!Object.keys(sched).length){
+          showError("No schedule data for this trainer.");
+        }
+
+        const availableDates = fillDateOptions(sched);
+        const dateQ = qp("date");
+        const defaultISO = (dateQ && availableDates.includes(dateQ)) ? dateQ : (availableDates[0] || "");
+        $("date").value = defaultISO;
+        if (defaultISO) fillTimeOptionsForDate(sched, defaultISO);
+
+        $("date").addEventListener("change", (e)=> fillTimeOptionsForDate(sched, e.target.value));
+
+        trainerSelect.addEventListener("change", async (e)=>{
+          setLoading(true, "Reloading schedule…");
+          const sel=e.target.selectedOptions[0];
+          $("trainerId").value = sel.getAttribute("data-id");
+          trainerName = sel.value;
+
+          try{
+            const trainers2 = await loadTrainersAny();
+            const trainer2 = Array.isArray(trainers2)? trainers2.find(t=>t.name===trainerName) : null;
+            const sched2 = buildWeekScheduleLoose(trainer2);
+            const avail2 = fillDateOptions(sched2);
+            const first = avail2[0] || "";
+            $("date").value = first;
+            fillTimeOptionsForDate(sched2, first);
+            $("timeSlot").value = "";
+          }catch(err){
+            showError("Reload trainer failed.");
+            log("Reload error: "+(err.message||err));
+          }finally{
+            setLoading(false);
+          }
+        });
+
+        setLoading(false);
+      }
+
+      document.addEventListener("DOMContentLoaded", init);
+    </script>
+  </body>
+</html>
