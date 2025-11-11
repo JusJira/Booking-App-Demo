@@ -130,17 +130,33 @@
       
      function buildWeekSchedule(trainer) {
   const sched = {};
-  if (!trainer || !Array.isArray(trainer.schedule)) return sched;
+  if (!trainer) return sched;
 
-  trainer.schedule.forEach((slotRaw) => {
+  // 1) รับทุกแบบ: Array จริง / สตริง JSON / null
+  let raw = trainer.schedule;
+  let arr = [];
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (typeof raw === "string") {
+    try {
+      arr = JSON.parse(raw); // แก้กรณี backend ส่งเป็น TEXT ของ JSON
+    } catch {
+      console.warn("schedule is string but not valid JSON:", raw);
+      arr = [];
+    }
+  } else {
+    arr = [];
+  }
+
+  // 2) แปลง/parse แต่ละรายการ
+  arr.forEach((slotRaw) => {
     if (typeof slotRaw !== "string") return;
 
-    // Fix EN DASH → hyphen and normalize whitespace
+    // แปลง EN DASH → hyphen และ normalize ช่องว่าง
     let s = slotRaw.replace(/\u2013/g, "-").replace(/\s+/g, " ").trim();
 
-    // Now accept `Mon`, `Monday`, etc + optional spaces around '-'
+    // รองรับ Mon/Monday + อนุญาตช่องว่างรอบ '-'
     const m = s.match(/^([A-Za-z]+)\s+([0-2]\d:[0-5]\d)\s*-\s*([0-2]\d:[0-5]\d)$/);
-
     if (!m) {
       console.warn("Unmatched schedule entry:", s);
       return;
@@ -150,7 +166,6 @@
     if (!dayAbbrev) return;
 
     const timeStr = `${m[2]}-${m[3]}`;
-
     if (!sched[dayAbbrev]) sched[dayAbbrev] = [];
     sched[dayAbbrev].push(timeStr);
   });
