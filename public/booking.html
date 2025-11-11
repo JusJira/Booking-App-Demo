@@ -250,7 +250,10 @@ function coerceScheduleToArray(raw) {
         let sched = {};
         try {
           const trainers = await fetchTrainers();
+          console.log("TRAINERS API RAW =", trainers);
           const trainer = trainers.find((t) => t.name === trainerName);
+          console.log("Selected trainer =", trainer);
+          console.log("Raw trainer.schedule =", trainer?.schedule);
           sched = buildWeekSchedule(trainer);
         } catch (e) {
           console.error("Failed to fetch trainer schedule:", e);
