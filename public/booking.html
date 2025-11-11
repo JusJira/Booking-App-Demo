@@ -10,31 +10,24 @@
     <div class="container mx-auto px-4 py-8 max-w-2xl">
       <h1 class="text-3xl font-bold text-white mb-6">Class Booking</h1>
 
-      <form
-        method="POST"
-        action="/book"
-        class="bg-white p-6 rounded-lg shadow-md space-y-4"
-      >
+      <form method="POST" action="/book" class="bg-white p-6 rounded-lg shadow-md space-y-4">
         <div>
-          <label for="trainer" class="block text-gray-700 font-semibold mb-2"
-            >Trainer</label
-          >
+          <label for="trainer" class="block text-gray-700 font-semibold mb-2">Trainer</label>
           <select
             id="trainer"
             name="trainer"
             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          required
-            >
+            required
+          >
             <option value="Daniel Smith" data-id="1">Daniel Smith</option>
             <option value="Emma Wilson" data-id="2">Emma Wilson</option>
-            <option value="John Carte" data-id="3">John Carter</option>
+            <option value="John Carter" data-id="3">John Carter</option>
             <option value="Michael Brown" data-id="4">Michael Brown</option>
             <option value="Sophia Miller" data-id="5">Sophia Miller</option>
-            </select> 
-             <!--Class-->
-          <label for="class" class="block text-gray-700 font-semibold mb-2"
-            >Class</label
-          >
+          </select>
+
+          <!-- Class -->
+          <label for="class" class="block text-gray-700 font-semibold mb-2 mt-4">Class</label>
           <input
             id="class"
             name="class"
@@ -42,19 +35,18 @@
             readonly
           />
         </div>
-        <!--Price-->
-            <div>
-             <label for="price" class="block text-gray-700 font-semibold mb-2"
-              >Price (THB)</label
-             >
-             <input
-               id="price"
-              name="price"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              readonly
+
+        <!-- Price -->
+        <div>
+          <label for="price" class="block text-gray-700 font-semibold mb-2">Price (THB)</label>
+          <input
+            id="price"
+            name="price"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            readonly
           />
         </div>
-        
+
         <!-- Date (Native Picker) -->
         <div>
           <label for="date" class="block text-gray-700 font-semibold mb-2">Date</label>
@@ -65,13 +57,12 @@
             required
             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <p id="dateHelp" class="text-xs text-gray-500 mt-1">Only dates that match the trainer’s weekly schedule will show time slots.</p>
         </div>
 
-        <!--Time-->
+        <!-- Time -->
         <div>
-          <label for="timeSlot" class="block text-gray-700 font-semibold mb-2"
-            >Time</label
-          >
+          <label for="timeSlot" class="block text-gray-700 font-semibold mb-2">Time</label>
           <select
             id="timeSlot"
             name="timeSlot"
@@ -79,7 +70,7 @@
             required
           >
             <option value="">Choose a time</option>
-          </select> <!--เลือกเวลา--> 
+          </select>
           <div id="scheduleNote" class="text-sm text-gray-500 mt-2"></div>
         </div>
 
@@ -96,9 +87,7 @@
       </form>
 
       <p class="mt-4">
-        <a href="/trainers.html" class="text-blue-500 hover:underline"
-          >← Back to class</a 
-        >
+        <a href="/trainers.html" class="text-blue-500 hover:underline">← Back to class</a>
       </p>
     </div>
 
@@ -108,57 +97,63 @@
         return new URLSearchParams(location.search).get(key) || "";
       }
       function toISODate(d) {
-        return d.toISOString().slice(0, 10);
+        // local date -> YYYY-MM-DD
+        const tzOffset = d.getTimezoneOffset() * 60000;
+        const local = new Date(d.getTime() - tzOffset);
+        return local.toISOString().slice(0, 10);
       }
       function parseISODate(s) {
         const [y, m, d] = s.split("-").map(Number);
         return new Date(y, m - 1, d);
       }
       function weekdayKeyFromDateStr(iso) {
-        return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-          parseISODate(iso).getDay()
-        ];
+        return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][parseISODate(iso).getDay()];
       }
 
-      // ----------------- Get available dates -----------------
-      function getAvailableDates(sched, maxDays = 90) {
-        const dates = [];
-        let d = new Date();
+      // ----------------- Schedule utils -----------------
+      function buildWeekSchedule(trainer) {
+        // Expect trainer.schedule like ["Mon 09:00-11:00","Thu 14:00-16:00"]
+        const sched = {};
+        if (trainer && Array.isArray(trainer.schedule)) {
+          trainer.schedule.forEach((slot) => {
+            if (typeof slot !== "string") return;
+            const parts = slot.trim().split(/\s+/);
+            const day = parts[0]; // Mon/Tue/...
+            const time = parts.slice(1).join(" "); // "09:00-11:00"
+            if (!day || !time) return;
+            if (!sched[day]) sched[day] = [];
+            sched[day].push(time);
+          });
+        }
+        return sched;
+      }
+
+      function getFirstAvailableDate(sched, maxDays = 90, preferISO) {
+        const today = new Date();
         for (let i = 0; i < maxDays; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() + i);
           const iso = toISODate(d);
           const wk = weekdayKeyFromDateStr(iso);
           if (sched[wk] && sched[wk].length) {
-            dates.push(iso);
+            if (!preferISO || preferISO === iso) return iso;
           }
-          d.setDate(d.getDate() + 1);
         }
-        return dates;
+        return ""; // none found
       }
 
-      // ----------------- UI fillers -----------------
-      function fillDateOptions(sched) {
-        const dateSel = document.getElementById("date");
-        const availableDates = getAvailableDates(sched);
-        availableDates.forEach((iso) => {
-          const opt = document.createElement("option");
-          opt.value = iso;
-          const d = parseISODate(iso);
-          const day = weekdayKeyFromDateStr(iso);
-          const date = d.getDate();
-          const month = d.toLocaleString("en", { month: "short" });
-          const year = d.getFullYear();
-          opt.textContent = `${day} ${date} ${month} ${year}`;
-          dateSel.appendChild(opt);
-        });
-        return availableDates;
-      }
-
-      function fillTimeOptionsForDate(sched, isoDate) {
+      function refreshTimeOptionsForDate(sched, isoDate) {
         const timeSel = document.getElementById("timeSlot");
         const note = document.getElementById("scheduleNote");
         const btn = document.getElementById("bookBtn");
 
         timeSel.innerHTML = '<option value="">Choose a time</option>';
+
+        if (!isoDate) {
+          note.textContent = "Please pick a date.";
+          btn.disabled = true;
+          return;
+        }
 
         const wk = weekdayKeyFromDateStr(isoDate);
         const slots = sched[wk] || [];
@@ -172,83 +167,107 @@
           });
           note.textContent = `Available on ${wk}: ${slots.join(", ")}`;
           btn.disabled = false;
-          btn.style.opacity = 1;
         } else {
           note.textContent = `No classes on this day.`;
           btn.disabled = true;
-          btn.style.opacity = 0.6;
         }
+      }
+
+      async function fetchTrainers() {
+        const res = await fetch("/api/trainers");
+        if (!res.ok) throw new Error("Failed to load trainers");
+        return res.json();
+      }
+
+      async function loadScheduleAndRefresh(trainerName, preferredISO, preferredTime) {
+        // Load trainers, find selected one, build sched
+        let sched = {};
+        try {
+          const trainers = await fetchTrainers();
+          const trainer = trainers.find((t) => t.name === trainerName);
+          sched = buildWeekSchedule(trainer);
+        } catch (e) {
+          console.error("Failed to fetch trainer schedule:", e);
+          sched = {};
+        }
+
+        // Decide default date (prefer query date if valid)
+        let defaultISO = preferredISO;
+        if (defaultISO) {
+          const wk = weekdayKeyFromDateStr(defaultISO);
+          if (!sched[wk] || !sched[wk].length) {
+            defaultISO = ""; // not valid for this trainer
+          }
+        }
+        if (!defaultISO) {
+          defaultISO = getFirstAvailableDate(sched, 90);
+        }
+
+        const dateInput = document.getElementById("date");
+        dateInput.value = defaultISO || "";
+
+        // Optional min/max to help UX (today .. +90d)
+        const today = new Date();
+        const max = new Date();
+        max.setDate(today.getDate() + 90);
+        dateInput.min = toISODate(today);
+        dateInput.max = toISODate(max);
+
+        refreshTimeOptionsForDate(sched, dateInput.value);
+
+        // if a preferred time was passed (e.g., from URL), keep it if valid
+        if (preferredTime) {
+          const sel = document.getElementById("timeSlot");
+          const has = Array.from(sel.options).some((o) => o.value === preferredTime);
+          if (has) sel.value = preferredTime;
+        }
+
+        // Hook date change to update times
+        dateInput.onchange = (e) => {
+          refreshTimeOptionsForDate(sched, e.target.value);
+        };
       }
 
       // ----------------- Init -----------------
       document.addEventListener("DOMContentLoaded", async () => {
+        const trainerSelect = document.getElementById("trainer");
+
+        // Read query params
         let trainerName = qp("trainer");
         let className = qp("class");
         let price = qp("price");
         let dateQ = qp("date");
         let timeQ = qp("time");
-        let trainerId = qp("trainerId");
         let classId = qp("classId");
 
-        // เซ็ตค่าเริ่มต้นในฟอร์ม
-        const trainerSelect = document.getElementById("trainer");
-        const trainerOption = Array.from(trainerSelect.options).find(opt => opt.value === trainerName);
-        if (trainerOption) {
-          trainerSelect.value = trainerName;
-          document.getElementById("trainerId").value = trainerOption.getAttribute("data-id");
+        // Set form fields
+        if (trainerName) {
+          const trainerOption = Array.from(trainerSelect.options).find((opt) => opt.value === trainerName);
+          if (trainerOption) {
+            trainerSelect.value = trainerName;
+            document.getElementById("trainerId").value = trainerOption.getAttribute("data-id");
+          }
+        } else {
+          // default to current selection
+          document.getElementById("trainerId").value = trainerSelect.selectedOptions[0].getAttribute("data-id");
+          trainerName = trainerSelect.value;
         }
 
-        document.getElementById("class").value = className;
-        document.getElementById("price").value = price;
-        document.getElementById("classId").value = classId;
+        document.getElementById("class").value = className || "";
+        document.getElementById("price").value = price || "";
+        document.getElementById("classId").value = classId || "";
 
-  // อัปเดต trainerId เมื่อเปลี่ยนชื่อ Trainer
-        trainerSelect.addEventListener("change", (e) => {
-        const selectedOption = e.target.selectedOptions[0];
-        const trainerName = selectedOption.value;
-        const trainerId = selectedOption.getAttribute("data-id");
-        document.getElementById("trainerId").value = trainerId;
+        // When trainer changes, update hidden id and reload schedule/date/time
+        trainerSelect.addEventListener("change", async (e) => {
+          const selectedOption = e.target.selectedOptions[0];
+          document.getElementById("trainerId").value = selectedOption.getAttribute("data-id");
+          await loadScheduleAndRefresh(selectedOption.value, "", "");
+          // clear previously chosen time
+          document.getElementById("timeSlot").value = "";
         });
 
-
-        // Fetch trainer schedule from DB
-        let sched = {};
-        try {
-          const response = await fetch("/api/trainers");
-          const trainers = await response.json();
-          const trainer = trainers.find((t) => t.name === trainerName);
-          if (trainer && trainer.schedule) {
-            trainer.schedule.forEach((slot) => {
-              const [day, time] = slot.split(" ");
-              if (!sched[day]) sched[day] = [];
-              sched[day].push(time);
-            });
-          }
-        } catch (err) {
-          console.error("Failed to fetch trainer schedule:", err);
-        }
-
-        const availableDates = fillDateOptions(sched);
-
-        let defaultISO = dateQ;
-        if (!defaultISO || !availableDates.includes(defaultISO)) {
-          defaultISO = availableDates[0] || "";
-        }
-        document.getElementById("date").value = defaultISO;
-
-        if (defaultISO) {
-          fillTimeOptionsForDate(sched, defaultISO);
-          if (timeQ) {
-            const sel = document.getElementById("timeSlot");
-            const has = Array.from(sel.options).some((o) => o.value === timeQ);
-            if (has) sel.value = timeQ;
-          }
-        }
-
-        // Refresh time slots when the date changes
-        document.getElementById("date").addEventListener("change", (e) => {
-          fillTimeOptionsForDate(sched, e.target.value);
-        });
+        // Initial load with URL preferences (if any)
+        await loadScheduleAndRefresh(trainerName, dateQ, timeQ);
       });
     </script>
   </body>
