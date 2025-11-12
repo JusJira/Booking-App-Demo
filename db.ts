@@ -78,7 +78,6 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         level: "Beginner–Intermediate",
         length: "60–75 minutes",
         group_size: "Up to 8",
-        status: "Available",
       },
       {
         name: "Yoga & Flexibility",
@@ -95,7 +94,6 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         level: "All levels",
         length: "60 minutes",
         group_size: "Up to 12",
-        status: "Full",
       },
       {
         name: "Cardio Fitness",
@@ -112,7 +110,6 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         level: "Beginner–Advanced (scaled)",
         length: "60–75 minutes",
         group_size: "Up to 10",
-        status: "Available",
       },
       {
         name: "CrossFit",
@@ -129,7 +126,6 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         level: "Intermediate–Advanced (scaled for beginners)",
         length: "75 minutes",
         group_size: "Up to 12",
-        status: "Available",
       },
       {
         name: "Zumba & Dance",
@@ -146,14 +142,13 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         level: "All levels (no dance experience needed)",
         length: "60 minutes",
         group_size: "Up to 20",
-        status: "Available",
       },
     ];
 
     for (const c of classData) {
       await client.query(
-        `INSERT INTO classes (name, price, about, syllabus, level, length, group_size, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO classes (name, price, about, syllabus, level, length, group_size)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (name) DO NOTHING`,
         [
           c.name,
@@ -163,7 +158,6 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
           c.level,
           c.length,
           c.group_size,
-          c.status,
         ]
       );
     }
@@ -396,17 +390,16 @@ export async function listTrainers(): Promise<any[]> {
       c.syllabus AS syllabus,
       c.level AS level,
       c.length AS length,
-      c.group_size AS group_size,
-      c.status AS status
+      c.group_size AS group_size
 
     FROM trainers t
     LEFT JOIN bookings b
-      ON t.id = b."trainerId"     -- ✅ ใส่เครื่องหมาย " "
+      ON t.id = b."trainerId"     
     LEFT JOIN classes c
-      ON b."classId" = c.id       -- ✅ ใส่เครื่องหมาย " "
+      ON b."classId" = c.id       
     GROUP BY
       t.id, t.name, t.schedule,
-      c.id, c.name, c.price, c.about, c.syllabus, c.level, c.length, c.group_size, c.status
+      c.id, c.name, c.price, c.about, c.syllabus, c.level, c.length, c.group_size
     ORDER BY t.name
   `;
 
@@ -424,7 +417,6 @@ export async function listTrainers(): Promise<any[]> {
     level: r.level,
     length: r.length,
     group_size: r.group_size,
-    status: r.status ?? 'Available',
   }));
 }
 
@@ -433,7 +425,7 @@ export async function listTrainers(): Promise<any[]> {
 // NEW: คืนรายการคลาสทั้งหมด
 export async function listClasses(): Promise<any[]> {
   const res = await pool.query(`
-    SELECT id, name, price, about, syllabus, level, length, group_size, status
+    SELECT id, name, price, about, syllabus, level, length, group_size
     FROM classes
     ORDER BY id
   `);
