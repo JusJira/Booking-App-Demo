@@ -220,7 +220,7 @@ export interface User {
 export interface BookingInput {
   userId?: string | null;
   name: string;
-  trainerId: string;
+  trainerId?: number | null; 
   classId: string;
   price: number;
   createdAt?: string;
@@ -307,7 +307,7 @@ export async function addBooking(input: BookingInput): Promise<{ id: string }> {
     [
       userId || null,
       name,
-      trainerId,
+      trainerId ?? null,     
       classId,
       price,
       createdAt || new Date().toISOString(),
