@@ -34,8 +34,7 @@ const pool = new Pool({ connectionString: CONNECTION_STRING });
         syllabus JSONB NOT NULL,
         level TEXT NOT NULL,
         length TEXT NOT NULL,
-        group_size TEXT NOT NULL,
-       status TEXT NOT NULL DEFAULT 'Available'
+        group_size TEXT NOT NULL
       );
     `);
 
