@@ -299,22 +299,33 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 export async function addBooking(input: BookingInput): Promise<{ id: string }> {
-  const { userId, name, trainerId, classId, price, createdAt, bookedTime, email } =
-    input;
+  const {
+    userId,
+    name,
+    trainerId,
+    classId,
+    price,
+    createdAt,
+    bookedTime,
+    email
+  } = input;
+
   const res = await pool.query(
     `INSERT INTO bookings ("userId", name, "trainerId", "classId", price, "createdAt", "bookedTime", email)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id`,
     [
-      userId || null,
-      name,
-      trainerId ?? null,     
-      classId,
-      price,
+      String(userId) || null,
+      String(name),
+      trainerId != null ? String(trainerId) : null,
+      classId != null ? String(classId) : null,
+      price != null ? Number(price) : null,
       createdAt || new Date().toISOString(),
       bookedTime || new Date().toISOString(),
-      email || null,
+      email ? String(email) : null,
     ]
   );
+
   return { id: String(res.rows[0].id) };
 }
 
